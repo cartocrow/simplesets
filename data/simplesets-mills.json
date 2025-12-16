@@ -1,0 +1,32 @@
+{
+  "type": "simplesets",
+  "points": "mills.txt",
+  "generalSettings" : {
+    "pointSize": 1.5,
+    "inflectionLimit": 2,
+    "maxBendAngle": 3.1415,
+    "maxTurnAngle": 1.22
+  },
+  "drawSettings" : {
+    "colors": [
+      "0xA6CEE3",
+      "0xB2DF8A",
+      "0xFDBF6F",
+      "0xCAB2D6"
+    ],
+    "whiten": 0.7
+  },
+  "partitionSettings": {
+    "banks": true,
+    "islands": true,
+    "regularityDelay": true,
+    "intersectionDelay": false,
+    "admissibleRadiusFactor": 0.5
+  },
+  "computeDrawingSettings": {
+    "cutoutRadiusFactor": 0.675,
+    "smooth": true,
+    "smoothingRadiusFactor": 0.2
+  },
+  "cover" : 4.7
+}
