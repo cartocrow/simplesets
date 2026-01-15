@@ -1,7 +1,6 @@
 set(SOURCES
     simplesets_gui.cpp
     ../colors/colors.cpp
-    ../widgets/double_slider.h
 )
 
 add_executable(simplesets_gui ${SOURCES})
@@ -12,6 +11,7 @@ target_link_libraries(
     simplesets
     cartocrow::core
     cartocrow::renderer
+    cartocrow::widgets
     CGAL::CGAL
     Qt5::Widgets
 )

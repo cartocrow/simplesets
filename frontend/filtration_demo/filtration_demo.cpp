@@ -9,7 +9,7 @@
 #include "library/partition_painting.h"
 #include "library/types.h"
 #include "frontend/colors/colors.h"
-#include "frontend/widgets/double_slider.h"
+#include <cartocrow/widgets/double_slider.h>
 #include <CGAL/Bbox_2.h>
 #include <QApplication>
 #include <QDockWidget>
