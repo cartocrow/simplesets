@@ -30,6 +30,9 @@ endif()
 # All source files should use include paths relative to the source root
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
+# Not necessary for cartocrow/core version > v0.1.0
+include_directories(${CavalierContours_INCLUDE_DIR})
+
 add_subdirectory(library)
 if (EMSCRIPTEN)
     add_subdirectory(wasm_frontend)
