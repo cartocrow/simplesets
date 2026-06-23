@@ -1,5 +1,6 @@
 # CartoCrow: SimpleSets
 [![arXiv](https://img.shields.io/badge/arXiv-2407.14433-b31b1b.svg)](https://arxiv.org/abs/2407.14433)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20816553.svg)](https://doi.org/10.5281/zenodo.20816553)
 
 This repository contains an implementation of SimpleSets.
 Given a set of points in the plane that each belong to one category, SimpleSets creates simple shapes that enclose patterns in the data.
