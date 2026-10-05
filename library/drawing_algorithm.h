@@ -214,6 +214,8 @@ class DilatedPatternDrawing {
 class SimpleSetsPainting : public renderer::GeometryPainting {
   public:
 	SimpleSetsPainting(const DilatedPatternDrawing& dpd, const DrawSettings& ds);
+    // If there is a total stacking order then return the polygons in order.
+    std::optional<std::vector<std::pair<int, CSPolygon>>> getStackedPolygons() const;
 	void paint(renderer::GeometryRenderer& renderer) const override;
 
   private:

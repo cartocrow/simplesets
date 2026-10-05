@@ -12,3 +12,11 @@ target_link_libraries(
     cartocrow::renderer
     simplesets
 )
+
+target_link_options(simplesets_wasm PRIVATE
+    --emit-tsd "$<TARGET_FILE_DIR:simplesets_wasm>/simplesets_wasm.d.ts"
+    -sMODULARIZE -sEXPORT_ES6
+        -g
+        -gsource-map
+        -sASSERTIONS
+)

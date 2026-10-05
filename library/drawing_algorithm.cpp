@@ -1029,55 +1029,66 @@ std::string to_string(Order ord) {
 SimpleSetsPainting::SimpleSetsPainting(const DilatedPatternDrawing& dpd, const DrawSettings& ds)
     : m_ds(ds), m_dpd(dpd) {}
 
-void SimpleSetsPainting::paint(renderer::GeometryRenderer& renderer) const {
-	auto stackingOrder = m_dpd.totalStackingOrder();
-	// If there is a stacking order, draw the complete patterns stacked in that order
-	if (stackingOrder.has_value()) {
-		for (int i : *stackingOrder) {
-            std::vector<CComponent> comps;
-			connectedComponents(m_dpd.m_arr, std::back_inserter(comps), [i](const FaceH& fh) {
-				const auto& ors = fh->data().origins;
-				return std::find(ors.begin(), ors.end(), i) != ors.end();
-			});
-			assert(comps.size() == 1);
-			const auto& comp = comps[0];
+std::optional<std::vector<std::pair<int, CSPolygon>>>
+SimpleSetsPainting::getStackedPolygons() const {
+    std::vector<std::pair<int, CSPolygon>> polys;
 
-			std::vector<CSPolyline> boundaryPieces;
-			for (auto fit = comp.faces_begin(); fit != comp.faces_end(); ++fit) {
-				auto& data = fit->data();
-				if (data.morphedFace.contains(i)) {
-					std::copy(data.morphedEdges[i].begin(), data.morphedEdges[i].end(), std::back_inserter(boundaryPieces));
-				} else {
-					FaceH fh = fit.handle();
-					auto bps = boundaryParts(fh, i);
-					std::copy(bps.begin(), bps.end(), std::back_inserter(boundaryPieces));
-				}
-			}
+    auto stackingOrder = m_dpd.totalStackingOrder();
+    // If there is a stacking order, draw the complete patterns stacked in that order
+    if (!stackingOrder.has_value()) { return std::nullopt; }
+    for (int i: *stackingOrder) {
+        std::vector<CComponent> comps;
+        connectedComponents(m_dpd.m_arr, std::back_inserter(comps), [i](const FaceH &fh) {
+            const auto &ors = fh->data().origins;
+            return std::find(ors.begin(), ors.end(), i) != ors.end();
+        });
+        assert(comps.size() == 1);
+        const auto &comp = comps[0];
 
-			// no order or hash on OneRootPoint :(
+        std::vector<CSPolyline> boundaryPieces;
+        for (auto fit = comp.faces_begin(); fit != comp.faces_end(); ++fit) {
+            auto &data = fit->data();
+            if (data.morphedFace.contains(i)) {
+                std::copy(data.morphedEdges[i].begin(), data.morphedEdges[i].end(),
+                          std::back_inserter(boundaryPieces));
+            } else {
+                FaceH fh = fit.handle();
+                auto bps = boundaryParts(fh, i);
+                std::copy(bps.begin(), bps.end(), std::back_inserter(boundaryPieces));
+            }
+        }
+
+        // no order or hash on OneRootPoint :(
 //			std::map<OneRootPoint, int> sourceToI;
 //			for (int j = 0; j < boundaryPieces.size(); ++j) {
 //				auto& bp = boundaryPieces[j];
 //				sourceToI[bp.curves_begin()->source()] = j;
 //			}
-			std::vector<CSXMCurve> xm_curves;
+        std::vector<CSXMCurve> xm_curves;
 
-			std::copy(boundaryPieces[0].curves_begin(), boundaryPieces[0].curves_end(), std::back_inserter(xm_curves));
-			int count = 1;
-			while (count < boundaryPieces.size()) {
-				auto head = xm_curves.back().target();
-				for (const auto& bp : boundaryPieces) {
-					if (bp.curves_begin()->source() == head) {
-						std::copy(bp.curves_begin(), bp.curves_end(), std::back_inserter(xm_curves));
-					}
-				}
-				++count;
-			}
+        std::copy(boundaryPieces[0].curves_begin(), boundaryPieces[0].curves_end(), std::back_inserter(xm_curves));
+        int count = 1;
+        while (count < boundaryPieces.size()) {
+            auto head = xm_curves.back().target();
+            for (const auto &bp: boundaryPieces) {
+                if (bp.curves_begin()->source() == head) {
+                    std::copy(bp.curves_begin(), bp.curves_end(), std::back_inserter(xm_curves));
+                }
+            }
+            ++count;
+        }
 
-			CSPolygon csPolygon(xm_curves.begin(), xm_curves.end());
+        polys.emplace_back(m_dpd.m_dilated[i].category(), CSPolygon(xm_curves.begin(), xm_curves.end()));
+    }
+    return polys;
+}
 
+void SimpleSetsPainting::paint(renderer::GeometryRenderer& renderer) const {
+    auto stackedPolys = getStackedPolygons();
+    if (stackedPolys) {
+        for (const auto& [cat, csPolygon] : *stackedPolys) {
 			renderer.setMode(GeometryRenderer::fill | GeometryRenderer::stroke);
-			renderer.setFill(whiten(m_ds.getColor(m_dpd.m_dilated[i].category()), m_ds.whiten));
+			renderer.setFill(whiten(m_ds.getColor(cat), m_ds.whiten));
 			renderer.setStroke(Color{0, 0, 0}, m_ds.contourStrokeWeight(m_dpd.m_gs), true);
 			renderer.draw(renderPath(csPolygon));
 		}
