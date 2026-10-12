@@ -25,7 +25,9 @@ std::optional<Polygon<Inexact>> convexIntersection(const Polygon<Inexact>& p, co
 Number<Inexact> coverRadiusOfPoints(const std::vector<Point<Inexact>>& points) {
 	DT dt;
 	std::vector<Point<Exact>> exact_points;
-	pretendExact(points.begin(), points.end(), std::back_inserter(exact_points));
+	for (const auto& pt : points) {
+		exact_points.push_back(pretendExact(pt));
+	}
 	dt.insert(exact_points.begin(), exact_points.end());
 
 	Rectangle<Inexact> bbox = CGAL::bounding_box(points.begin(), points.end());
