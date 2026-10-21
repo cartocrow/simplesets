@@ -19,7 +19,6 @@
 #include <QVBoxLayout>
 
 using namespace cartocrow;
-using namespace cartocrow::renderer;
 using namespace cartocrow::simplesets;
 
 // These are parameters for exporting a 'continuous' sequence of frames to ipe.

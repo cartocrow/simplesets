@@ -37,8 +37,8 @@ int main(int argc, char* argv[]) {
 
     if (projectData["type"] != "simplesets") return -1;
 
-    std::shared_ptr<renderer::GeometryPainting> painting;
-    std::shared_ptr<renderer::GeometryPainting> debugPainting;
+    std::shared_ptr<GeometryPainting> painting;
+    std::shared_ptr<GeometryPainting> debugPainting;
 
     // Parse points
     auto filePath = projectFilename.parent_path() / projectData["points"];
@@ -113,7 +113,7 @@ int main(int argc, char* argv[]) {
     if (wellSeparated) {
         auto dpd = simplesets::DilatedPatternDrawing(partition, gs, cds);
         auto ssPainting = simplesets::SimpleSetsPainting(dpd, ds);
-        auto pr = std::make_shared<renderer::PaintingRenderer>();
+        auto pr = std::make_shared<PaintingRenderer>();
         ssPainting.paint(*pr);
         painting = pr;
     } else {
@@ -128,7 +128,7 @@ int main(int argc, char* argv[]) {
     auto delta = CGAL::to_double(2 * gs.dilationRadius());
     Box expanded(box.xmin() - delta, box.ymin() - delta, box.xmax() + delta, box.ymax() + delta);
 
-    cartocrow::renderer::SvgRenderer renderer(painting);
+    cartocrow::SvgRenderer renderer(painting);
     renderer.save(outputFilename, expanded);
     return 0;
 }

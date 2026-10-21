@@ -175,9 +175,9 @@ class DilatedPatternDrawing {
 
 	std::vector<std::shared_ptr<Hyperedge>> hyperedges() const;
 
-	void drawFaceFill(FaceH fh, renderer::GeometryRenderer& renderer,
+	void drawFaceFill(FaceH fh, GeometryRenderer& renderer,
 				      const GeneralSettings& gs, const DrawSettings& ds) const;
-	void drawFaceStroke(FaceH fh, renderer::GeometryRenderer& renderer,
+	void drawFaceStroke(FaceH fh, GeometryRenderer& renderer,
 				        const GeneralSettings& gs, const DrawSettings& ds) const;
 	std::optional<std::vector<int>> totalStackingOrder() const;
 
@@ -191,7 +191,7 @@ class DilatedPatternDrawing {
   private:
 };
 
-/// A \ref renderer::GeometryPainting "Painting" of a SimpleSets visualization.
+/// A \ref GeometryPainting "Painting" of a SimpleSets visualization.
 ///
 /// A SimpleSets visualization is created in three steps:
 /// 1. \ref cartocrow::simplesets::partition "Partition" the categorical points (\ref CatPoint) into \ref cartocrow::simplesets::Pattern "patterns".
@@ -211,12 +211,12 @@ class DilatedPatternDrawing {
 /// - \ref PartitionSettings : parameters for the \ref partition function.
 /// - \ref ComputeDrawingSettings : parameters for the \ref DilatedPatternDrawing class.
 /// - \ref DrawSettings : parameters for drawing functions.
-class SimpleSetsPainting : public renderer::GeometryPainting {
+class SimpleSetsPainting : public GeometryPainting {
   public:
 	SimpleSetsPainting(const DilatedPatternDrawing& dpd, const DrawSettings& ds);
     // If there is a total stacking order then return the polygons in order.
     std::optional<std::vector<std::pair<int, CSPolygon>>> getStackedPolygons() const;
-	void paint(renderer::GeometryRenderer& renderer) const override;
+	void paint(GeometryRenderer& renderer) const override;
 
   private:
 	const DrawSettings& m_ds;

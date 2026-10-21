@@ -30,7 +30,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <filesystem>
 
 using namespace cartocrow;
-using namespace cartocrow::renderer;
 using namespace cartocrow::simplesets;
 
 class SimpleSetsDemo : public QMainWindow {

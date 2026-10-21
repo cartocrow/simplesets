@@ -16,7 +16,6 @@
 using namespace emscripten;
 
 using namespace cartocrow;
-using namespace cartocrow::renderer;
 using namespace cartocrow::simplesets;
 
 using json = nlohmann::json;

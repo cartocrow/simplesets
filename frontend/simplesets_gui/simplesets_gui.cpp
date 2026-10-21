@@ -40,7 +40,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 namespace fs = std::filesystem;
 using namespace cartocrow;
-using namespace cartocrow::renderer;
 using namespace cartocrow::simplesets;
 
 SimpleSetsDemo::SimpleSetsDemo() {

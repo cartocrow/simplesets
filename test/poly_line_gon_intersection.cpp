@@ -5,7 +5,6 @@
 #include <cartocrow/renderer/ipe_renderer.h>
 
 using namespace cartocrow;
-using namespace cartocrow::renderer;
 
 TEST_CASE("Intersection lies in polygon and has correct orientation") {
 	CSXMCurve xm_curve({-2, 0}, {2, 0});

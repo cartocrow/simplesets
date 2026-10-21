@@ -2,11 +2,11 @@
 
 namespace cartocrow::simplesets {
 
-void draw_poly_pattern(const PolyPattern& pattern, renderer::GeometryRenderer& renderer, const GeneralSettings& gs, const DrawSettings& ds) {
+void draw_poly_pattern(const PolyPattern& pattern, GeometryRenderer& renderer, const GeneralSettings& gs, const DrawSettings& ds) {
 	if (std::holds_alternative<Polyline<Inexact>>(pattern.poly())) {
-		renderer.setMode(renderer::GeometryRenderer::stroke);
+		renderer.setMode(GeometryRenderer::stroke);
 	} else {
-		renderer.setMode(renderer::GeometryRenderer::fill | renderer::GeometryRenderer::stroke);
+		renderer.setMode(GeometryRenderer::fill | GeometryRenderer::stroke);
 	}
 	renderer.setFill(ds.getColor(pattern.category()));
 	renderer.setFillOpacity(100);
@@ -21,7 +21,7 @@ void draw_poly_pattern(const PolyPattern& pattern, renderer::GeometryRenderer& r
 		renderer.setStroke(Color{0, 0, 0}, ds.pointStrokeWeight(gs), true);
 		renderer.setFillOpacity(255);
 		renderer.setFill(ds.getColor(pt.category));
-		renderer.setMode(renderer::GeometryRenderer::fill | renderer::GeometryRenderer::stroke);
+		renderer.setMode(GeometryRenderer::fill | GeometryRenderer::stroke);
 		renderer.draw(Circle<Inexact>{pt.point, gs.pointSize * gs.pointSize});
 	}
 }
@@ -29,7 +29,7 @@ void draw_poly_pattern(const PolyPattern& pattern, renderer::GeometryRenderer& r
 PartitionPainting::PartitionPainting(const Partition& partition, const GeneralSettings& gs, const DrawSettings& ds)
     : m_partition(partition), m_gs(gs), m_ds(ds) {}
 
-void PartitionPainting::paint(renderer::GeometryRenderer& renderer) const {
+void PartitionPainting::paint(GeometryRenderer& renderer) const {
 	for (const auto& pattern : m_partition) {
 		draw_poly_pattern(*pattern, renderer, m_gs, m_ds);
 	}

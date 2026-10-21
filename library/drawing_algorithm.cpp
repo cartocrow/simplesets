@@ -13,7 +13,7 @@
 #include <CGAL/Boolean_set_operations_2/Gps_polygon_validation.h>
 #include <utility>
 
-using namespace cartocrow::renderer;
+using namespace cartocrow;
 
 namespace cartocrow::simplesets {
 // todo: deal with holes
@@ -748,7 +748,7 @@ Color whiten(const Color& color, double a) {
 	return {static_cast<int>(255 * a + color.r * (1-a)), static_cast<int>(255 * a + color.g * (1-a)), static_cast<int>(255 * a + color.b * (1-a))};
 }
 
-void DilatedPatternDrawing::drawFaceFill(FaceH fh, renderer::GeometryRenderer& renderer,
+void DilatedPatternDrawing::drawFaceFill(FaceH fh, GeometryRenderer& renderer,
                                      const GeneralSettings& gs, const DrawSettings& ds) const {
 	auto& d = fh->data();
 	for (int i : d.ordering) {
@@ -766,7 +766,7 @@ void DilatedPatternDrawing::drawFaceFill(FaceH fh, renderer::GeometryRenderer& r
 	}
 }
 
-void DilatedPatternDrawing::drawFaceStroke(FaceH fh, renderer::GeometryRenderer& renderer,
+void DilatedPatternDrawing::drawFaceStroke(FaceH fh, GeometryRenderer& renderer,
 										 const GeneralSettings& gs, const DrawSettings& ds) const {
 	auto& d = fh->data();
 	for (int index = 0; index < d.ordering.size(); ++index) {
@@ -1083,7 +1083,7 @@ SimpleSetsPainting::getStackedPolygons() const {
     return polys;
 }
 
-void SimpleSetsPainting::paint(renderer::GeometryRenderer& renderer) const {
+void SimpleSetsPainting::paint(GeometryRenderer& renderer) const {
     auto stackedPolys = getStackedPolygons();
     if (stackedPolys) {
         for (const auto& [cat, csPolygon] : *stackedPolys) {
@@ -1110,7 +1110,7 @@ void SimpleSetsPainting::paint(renderer::GeometryRenderer& renderer) const {
 	const auto& gs = m_dpd.m_gs;
 	renderer.setStroke(Color{0, 0, 0}, m_ds.pointStrokeWeight(gs), true);
 	renderer.setFillOpacity(255);
-	renderer.setMode(renderer::GeometryRenderer::fill | renderer::GeometryRenderer::stroke);
+	renderer.setMode(GeometryRenderer::fill | GeometryRenderer::stroke);
 	for (const auto& dp : m_dpd.m_dilated) {
 		for (const auto& cp : dp.catPoints()) {
 			renderer.setFill(m_ds.getColor(cp.category));

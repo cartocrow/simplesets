@@ -7,7 +7,7 @@
 #include <filesystem>
 
 using namespace cartocrow::simplesets;
-using namespace cartocrow::renderer;
+using namespace cartocrow;
 
 class FiltrationDemo: public QMainWindow {
 	Q_OBJECT
