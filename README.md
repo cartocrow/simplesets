@@ -18,14 +18,14 @@ CartoCrow/core can be cloned and built using CMake as described in <https://gith
 ## Compiling
 
 ### Emscripten
-To compile SimpleSets to WebAsssembly with Emscripten, do the following.
+To compile SimpleSets to WebAssembly with Emscripten, do the following.
 1. Compile [cartocrow/core](https://github.com/cartocrow/core) with Emscripten.
 2. Run the following commands; the placeholder paths refer to those in the [cartocrow/core](https://github.com/cartocrow/core) Emscripten installation instructions.
 ```sh
-emcmake cmake -S . -B wasm_build -DCMAKE_BUILD_TYPE=Release -DCartoCrow_DIR=<path/to/compiled_webassembly/lib/cmake/CartoCrow> -DEMSCRIPTEN_INCLUDE_DIR=<path/to/cartocrow_wasm_files>
+emcmake cmake -S . -B wasm_build -DCMAKE_BUILD_TYPE=Release -DCartoCrow_DIR=<path/to/cartocrow_wasm_files>/lib/cmake/CartoCrow -DEMSCRIPTEN_INCLUDE_DIR=<path/to/cartocrow_wasm_headers>
 cmake --build wasm_build
 ```
-This creates a `wasm_build/wasm_frontend/simplesets_wasm.js` file that exposes a JavaScript API.
+This creates `simplesets_wasm.js`, `simplesets_wasm.wasm` and TypeScript types `simplesets_wasm.d.ts` in `wasm_build/wasm_frontend`; the JavaScript file exposes the API.
 
 ## Usage
 The program receives as input points in the plane that each have exactly one category.
