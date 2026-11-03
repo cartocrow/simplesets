@@ -123,11 +123,12 @@ FiltrationDemo::FiltrationDemo() {
 			auto cover = i * timeStep;
 			Partition* thePartition;
 			bool found = false;
+			// Partition times can decrease, because a merge can enable merges at a smaller time, which are handled
+			// immediately. Stop at the first partition at or after the cover, as the Kotlin implementation of SimpleSets does.
 			for (auto& [time, partition] : m_partitions) {
-				if (time < cover) {
-					thePartition = &partition;
-					found = true;
-				}
+				if (time >= cover) break;
+				thePartition = &partition;
+				found = true;
 			}
 			auto& patterns = *(found ? thePartition : &m_partitions.front().second);
 			if (i > 1) {
@@ -151,11 +152,12 @@ FiltrationDemo::FiltrationDemo() {
 
 		Partition* thePartition;
 		bool found = false;
+		// Partition times can decrease, because a merge can enable merges at a smaller time, which are handled
+		// immediately. Stop at the first partition at or after the cover, as the Kotlin implementation of SimpleSets does.
 		for (auto& [time, partition] : m_partitions) {
-			if (time < m_cover) {
-				thePartition = &partition;
-				found = true;
-			}
+			if (time >= m_cover) break;
+			thePartition = &partition;
+			found = true;
 		}
 		auto& patterns = *(found ? thePartition : &m_partitions.front().second);
 

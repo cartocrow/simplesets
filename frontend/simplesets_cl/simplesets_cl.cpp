@@ -93,11 +93,12 @@ int main(int argc, char* argv[]) {
     // Draw
     simplesets::Partition* thePartition;
     bool found = false;
+    // Partition times can decrease, because a merge can enable merges at a smaller time, which are handled
+    // immediately. Stop at the first partition at or after the cover, as the Kotlin implementation of SimpleSets does.
     for (auto& [time, partition] : partitions) {
-        if (time < cover * gs.dilationRadius()) {
-            thePartition = &partition;
-            found = true;
-        }
+        if (time >= cover * gs.dilationRadius()) break;
+        thePartition = &partition;
+        found = true;
     }
     simplesets::Partition& partition = found ? (*thePartition) : partitions.front().second;
 
