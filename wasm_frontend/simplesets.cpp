@@ -387,7 +387,7 @@ EMSCRIPTEN_BINDINGS(simplesets) {
     // Settings structs
     value_object<GeneralSettings>("GeneralSettings")
             .field("pointSize", &GeneralSettings::pointSize)
-            .field("inflectionLimit", &GeneralSettings::inflectionLimit)
+            .field("bendLimit", &GeneralSettings::bendLimit)
             .field("maxBendAngle", &GeneralSettings::maxBendAngle)
             .field("maxTurnAngle", &GeneralSettings::maxTurnAngle);
 

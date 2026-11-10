@@ -71,7 +71,7 @@ const std::vector<CatPoint>& Bank::catPoints() const {
 }
 
 bool Bank::isValid(const GeneralSettings& gs) const {
-	bool inflectionIsFine = m_bends.size() <= gs.inflectionLimit;
+	bool inflectionIsFine = m_bends.size() <= gs.bendLimit;
 	bool anglesAreFine = true;
 	for (const auto& bend : m_bends) {
 		anglesAreFine = anglesAreFine && bend.maxAngle <= gs.maxTurnAngle;
