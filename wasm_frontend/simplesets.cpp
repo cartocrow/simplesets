@@ -253,7 +253,6 @@ public:
         // An event can lie in the past: a merge can enable merges at a smaller cover than the current time, which are
         // then handled immediately (see Section 4 of the SimpleSets paper). Its partition is created at the current
         // time of the simulation, not at the time of the event, so use the maximum of the event times so far.
-        // This matches the Kotlin implementation, which selects the partitions before the first one with time >= cover.
         Number<Inexact> currentTime = 0;
         for (const auto& [time, partition] : partitions) {
             currentTime = std::max(currentTime, time);

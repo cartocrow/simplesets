@@ -189,7 +189,7 @@ void SimpleSetsDemo::computeDrawing(double cover) {
 	Partition* thePartition;
 	bool found = false;
 	// Partition times can decrease, because a merge can enable merges at a smaller time, which are handled
-	// immediately. Stop at the first partition at or after the cover, as the Kotlin implementation of SimpleSets does.
+	// immediately. Stop at the first partition at or after the cover.
 	for (auto& [time, partition] : m_partitions) {
 		if (time >= cover * m_gs.dilationRadius()) break;
 		thePartition = &partition;
