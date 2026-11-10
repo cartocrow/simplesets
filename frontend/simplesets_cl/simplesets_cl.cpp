@@ -56,7 +56,8 @@ int main(int argc, char* argv[]) {
     simplesets::GeneralSettings gs;
     const auto& pdgs = pd["generalSettings"];
     gs.pointSize = pdgs["pointSize"];
-    gs.inflectionLimit = pdgs["inflectionLimit"];
+    // Older settings files call the bend limit inflectionLimit.
+    gs.bendLimit = pdgs.contains("bendLimit") ? pdgs["bendLimit"] : pdgs["inflectionLimit"];
     gs.maxBendAngle = pdgs["maxBendAngle"];
     gs.maxTurnAngle = pdgs["maxTurnAngle"];
 
@@ -93,11 +94,12 @@ int main(int argc, char* argv[]) {
     // Draw
     simplesets::Partition* thePartition;
     bool found = false;
+    // Partition times can decrease, because a merge can enable merges at a smaller time, which are handled
+    // immediately. Stop at the first partition at or after the cover.
     for (auto& [time, partition] : partitions) {
-        if (time < cover * gs.dilationRadius()) {
-            thePartition = &partition;
-            found = true;
-        }
+        if (time >= cover * gs.dilationRadius()) break;
+        thePartition = &partition;
+        found = true;
     }
     simplesets::Partition& partition = found ? (*thePartition) : partitions.front().second;
 

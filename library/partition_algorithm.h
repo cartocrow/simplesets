@@ -10,6 +10,8 @@
 #include "patterns/single_point.h"
 #include "settings.h"
 
+#include <functional>
+
 namespace cartocrow::simplesets {
 struct PossibleMergeEvent {
 	Number<Inexact> time;
@@ -25,7 +27,9 @@ Number<Inexact> intersectionDelay(const std::vector<CatPoint>& points, const Pol
 
 /// This function partition the categorical points using a discrete event simulation.
 /// Returns a vector of pairs (t_i, P_i) where t_i is the time in the event simulation that partition P_i was created.
+/// If \p progress is set, it is called with the fraction (between 0 and 1) of the simulation time that has been processed.
 std::vector<std::pair<Number<Inexact>, Partition>>
-partition(const std::vector<CatPoint>& points, const GeneralSettings& gs, const PartitionSettings& ps, Number<Inexact> maxTime);
+partition(const std::vector<CatPoint>& points, const GeneralSettings& gs, const PartitionSettings& ps, Number<Inexact> maxTime,
+          const std::function<void(double)>& progress = {});
 }
 #endif //CARTOCROW_PARTITION_ALGORITHM_H

@@ -6,9 +6,10 @@ namespace cartocrow::simplesets {
 struct GeneralSettings {
 	/// Radius of circle that represents a point.
 	Number<Inexact> pointSize = 1.0;
-	/// Maximum number of inflections a bank is allowed to have.
+	/// Maximum number of bends a bank is allowed to have.
+	/// A bank with at most 2 bends has at most one inflection.
 	/// The current implementation assumes this is at most 2.
-	int inflectionLimit = 2;
+	int bendLimit = 2;
 	/// Maximum total angle (in radians) of a bend (maximum monotone subsequence of a bank).
 	/// The current implementation assumes this is at most pi.
 	Number<Inexact> maxBendAngle = std::numbers::pi;

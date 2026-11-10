@@ -104,7 +104,8 @@ Number<Inexact> intersectionDelay(const std::vector<CatPoint>& points, const Pol
 }
 
 std::vector<std::pair<Number<Inexact>, Partition>>
-partition(const std::vector<CatPoint>& points, const GeneralSettings& gs, const PartitionSettings& ps, Number<Inexact> maxTime) {
+partition(const std::vector<CatPoint>& points, const GeneralSettings& gs, const PartitionSettings& ps, Number<Inexact> maxTime,
+          const std::function<void(double)>& progress) {
 	// Create initial partition consisting of single points
 	Partition partition;
 	std::transform(points.begin(), points.end(), std::back_inserter(partition), [](const auto& pt)
@@ -146,11 +147,20 @@ partition(const std::vector<CatPoint>& points, const GeneralSettings& gs, const 
 		}
 	}
 
+	// Events are handled in order of time, so the time of the current event indicates the progress.
+	double reportedProgress = 0;
+	if (progress) progress(0);
+
 	while (!events.empty()) {
 		auto ev = events.top();
 		events.pop();
 
 		if (ev.time > maxTime) break;
+
+		if (progress && ev.time / maxTime - reportedProgress >= 0.01) {
+			reportedProgress = ev.time / maxTime;
+			progress(reportedProgress);
+		}
 
 		if (!ev.final) {
 			auto delay = intersectionDelay(points, *ev.p1, *ev.p2, *ev.result, gs, ps);
@@ -291,6 +301,8 @@ partition(const std::vector<CatPoint>& points, const GeneralSettings& gs, const 
 			}
 		}
 	}
+
+	if (progress) progress(1);
 
 	return history;
 }

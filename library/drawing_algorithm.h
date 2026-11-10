@@ -7,6 +7,7 @@
 #include "partition.h"
 #include <CGAL/Arrangement_with_history_2.h>
 
+#include <functional>
 #include <utility>
 
 namespace cartocrow::simplesets {
@@ -164,7 +165,9 @@ bool isStraight(const CSPolyline& polyline);
 
 class DilatedPatternDrawing {
   public:
-	DilatedPatternDrawing(const Partition& partition, const GeneralSettings& gs, const ComputeDrawingSettings& cds);
+	/// If \p progress is set, it is called with the estimated fraction (between 0 and 1) of the computation that is done.
+	DilatedPatternDrawing(const Partition& partition, const GeneralSettings& gs, const ComputeDrawingSettings& cds,
+	                      const std::function<void(double)>& progress = {});
 
 	std::vector<CComponent> intersectionComponents(int i) const;
 	std::vector<CComponent> intersectionComponents(int i, int j) const;
@@ -187,6 +190,8 @@ class DilatedPatternDrawing {
 	std::vector<DilatedPoly> m_dilated;
 	const GeneralSettings& m_gs;
 	const ComputeDrawingSettings& m_cds;
+	/// Problems that did not stop the computation, such as cut-outs that could not be computed.
+	std::vector<std::string> m_warnings;
 
   private:
 };
@@ -216,6 +221,8 @@ class SimpleSetsPainting : public GeometryPainting {
 	SimpleSetsPainting(const DilatedPatternDrawing& dpd, const DrawSettings& ds);
     // If there is a total stacking order then return the polygons in order.
     std::optional<std::vector<std::pair<int, CSPolygon>>> getStackedPolygons() const;
+    // The complete shape of dilated pattern i, including the parts cut out to expose points beneath it.
+    CSPolygon patternPolygon(int i) const;
 	void paint(GeometryRenderer& renderer) const override;
 
   private:

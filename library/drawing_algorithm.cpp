@@ -9,6 +9,8 @@
 #include <cartocrow/circle_segment_helpers/poly_line_gon_intersection.h>
 #include <cartocrow/core/arrangement_helpers.h>
 #include "grow_circles.h"
+
+#include <set>
 #include <CGAL/Boolean_set_operations_2.h>
 #include <CGAL/Boolean_set_operations_2/Gps_polygon_validation.h>
 #include <utility>
@@ -150,8 +152,28 @@ bool operator==(const Hyperedge& lhs, const Hyperedge& rhs) {
 	return lhs.relations == rhs.relations && lhs.origins == rhs.origins;
 }
 
-DilatedPatternDrawing::DilatedPatternDrawing(const Partition& partition, const GeneralSettings& gs, const ComputeDrawingSettings& cds)
+// Estimated fractions of the computation time of DilatedPatternDrawing at the end of each phase.
+// Measured shares differ per input; for example, building the arrangement took 32% of the time for the diseasome
+// data set but 17% for the NYC data set.
+constexpr double INSERT_END = 0.3;
+constexpr double FACES_END = 0.35;
+constexpr double PREFERENCES_END = 0.5;
+
+DilatedPatternDrawing::DilatedPatternDrawing(const Partition& partition, const GeneralSettings& gs, const ComputeDrawingSettings& cds,
+                                             const std::function<void(double)>& progress)
 	: m_gs(gs), m_cds(cds) {
+	// Report progress at most once per percent.
+	double reportedProgress = -1;
+	auto report = [&](double phaseStart, double phaseEnd, double fraction) {
+		if (!progress) return;
+		double p = phaseStart + (phaseEnd - phaseStart) * fraction;
+		if (p - reportedProgress >= 0.01 || p == 1) {
+			reportedProgress = p;
+			progress(p);
+		}
+	};
+	report(0, 0, 0);
+
 	for (const auto& p : partition) {
 		m_dilated.emplace_back(*p, gs.dilationRadius());
 	}
@@ -168,12 +190,29 @@ DilatedPatternDrawing::DilatedPatternDrawing(const Partition& partition, const G
 	}
 
 	CGAL::insert(m_arr, curves.begin(), curves.end());
+	report(INSERT_END, INSERT_END, 0);
+
 	// Set for each face which pattern it is a subset of.
+	// The exact containment test is expensive, so first test whether the point lies in the bounding box of the pattern.
+	std::vector<CGAL::Bbox_2> boxes;
+	for (const auto& dilated : m_dilated) {
+		auto box = dilated.m_contour.bbox();
+		// Enlarge the box slightly so that points on the boundary are not excluded by rounding.
+		double margin = 1e-6 * std::max(box.xmax() - box.xmin(), box.ymax() - box.ymin());
+		boxes.emplace_back(box.xmin() - margin, box.ymin() - margin, box.xmax() + margin, box.ymax() + margin);
+	}
+	double numFaces = m_arr.number_of_faces();
+	double facesDone = 0;
 	for (auto fit = m_arr.faces_begin(); fit != m_arr.faces_end(); ++fit) {
+		report(INSERT_END, FACES_END, facesDone++ / numFaces);
 		if (fit->is_unbounded()) continue;
 		auto pt = get_point_in(*fit);
+		double x = CGAL::to_double(pt.x());
+		double y = CGAL::to_double(pt.y());
 		std::vector<int> origins;
 		for (int i = 0; i < m_dilated.size(); i++) {
+			const auto& box = boxes[i];
+			if (x < box.xmin() || x > box.xmax() || y < box.ymin() || y > box.ymax()) continue;
 			if (onOrInside(m_dilated[i].m_contour, pt)) {
 				origins.push_back(i);
 				m_iToFaces[i].push_back(fit);
@@ -204,14 +243,29 @@ DilatedPatternDrawing::DilatedPatternDrawing(const Partition& partition, const G
 		std::sort(facesI.begin(), facesI.end());
 	}
 
-	for (int i = 0; i < m_dilated.size(); i++) {
-		for (int j = i + 1; j < m_dilated.size(); j++) {
-			auto cs = intersectionComponents(i, j);
-			for (auto& c : cs) {
-				auto rel = computePreference(i, j, c);
-				for (auto fit = c.faces_begin(); fit != c.faces_end(); ++fit) {
-					fit->data().relations.push_back(rel);
-				}
+	// Only patterns that share a face overlap; the others need no preferences or cut-outs.
+	// The set is ordered, so pairs are handled in the same order as when looping over all pairs (i, j) with i < j.
+	std::set<std::pair<int, int>> overlappingPairs;
+	std::vector<bool> overlapsOther(m_dilated.size(), false);
+	for (auto fit = m_arr.faces_begin(); fit != m_arr.faces_end(); ++fit) {
+		const auto& origins = fit->data().origins;
+		for (int a = 0; a < origins.size(); ++a) {
+			for (int b = a + 1; b < origins.size(); ++b) {
+				overlappingPairs.emplace(std::min(origins[a], origins[b]), std::max(origins[a], origins[b]));
+				overlapsOther[origins[a]] = true;
+				overlapsOther[origins[b]] = true;
+			}
+		}
+	}
+
+	double pairsDone = 0;
+	for (const auto& [i, j] : overlappingPairs) {
+		report(FACES_END, PREFERENCES_END, pairsDone++ / overlappingPairs.size());
+		auto cs = intersectionComponents(i, j);
+		for (auto& c : cs) {
+			auto rel = computePreference(i, j, c);
+			for (auto fit = c.faces_begin(); fit != c.faces_end(); ++fit) {
+				fit->data().relations.push_back(rel);
 			}
 		}
 	}
@@ -240,52 +294,98 @@ DilatedPatternDrawing::DilatedPatternDrawing(const Partition& partition, const G
 		data.ordering = *ordering;
 	}
 
-	for (int i = 0; i < m_dilated.size(); ++i) {
-		auto cs = intersectionComponents(i);
-		for (auto& c : cs) {
-			std::unordered_set<int> avoidees;
-			for (auto fit = c.faces_begin(); fit != c.faces_end(); ++fit) {
-				for (int j : fit->data().ordering) {
-					if (j == i) break;
-					avoidees.insert(j);
+	// Morph the overlap components of each pattern so that the points beneath it stay visible.
+	// For each face in such a component, the morphed face is the intersection of the morphed component with the face,
+	// and the morphed edges are the intersection of the boundary of the morphed component with the face.
+	// The results are only stored once all components are done. If smoothing the cut-outs fails for some component
+	// (in a degenerate configuration), all components are morphed again without smoothing, so that the cut-outs look
+	// the same everywhere. If even that fails for a component, it is left as it is, which may hide points beneath it.
+	struct MorphedFace {
+		int i;
+		FaceH fh;
+		std::vector<CSPolyline> edges;
+		std::vector<CSPolygon> polygons;
+	};
+	auto morphComponents = [&](const ComputeDrawingSettings& cds, bool reportProgress, bool skipFailures) {
+		std::vector<MorphedFace> morphedFaces;
+		for (int i = 0; i < m_dilated.size(); ++i) {
+			if (reportProgress) report(PREFERENCES_END, 1, static_cast<double>(i) / m_dilated.size());
+			if (!overlapsOther[i]) continue;
+			auto cs = intersectionComponents(i);
+			for (auto& c : cs) {
+				std::unordered_set<int> avoidees;
+				for (auto fit = c.faces_begin(); fit != c.faces_end(); ++fit) {
+					for (int j : fit->data().ordering) {
+						if (j == i) break;
+						avoidees.insert(j);
+					}
 				}
-			}
-			if (avoidees.empty())
-				continue;
+				if (avoidees.empty())
+					continue;
 
-			auto bpis = boundaryParts(c, i);
-			auto disks = includeExcludeDisks(i, avoidees, c);
-			auto inclDisks = disks.include;
-			auto exclDisks = disks.exclude;
+				auto bpis = boundaryParts(c, i);
+				auto disks = includeExcludeDisks(i, avoidees, c);
+				auto inclDisks = disks.include;
+				auto exclDisks = disks.exclude;
 
-			if (exclDisks.empty()) {
-				continue;
-			}
-			auto componentPolygon = ccb_to_general_polygon<ArrCSTraits>(c.outer_ccb());
-			auto morphedComponentPolygon = morph(bpis, componentPolygon, inclDisks, exclDisks, m_gs, m_cds);
-
-			// Compute the morphed version of the CSPolygon for this component.
-			// Set, for each face in component c, the morphed face to the intersection of this CSPolygon with the face.
-			// Set the morphed edges to the intersection of the boundary of the polygon with the face.
-			for (auto fit = c.faces_begin(); fit != c.faces_end(); ++fit) {
-				auto facePolygon = face_to_polygon(*fit);
-
-				for (const auto& bp : bpis) {
-					CSPolyline mb = associatedBoundary(componentPolygon, morphedComponentPolygon, bp);
-					intersection(mb, facePolygon, std::back_inserter(fit->data().morphedEdges[i]), false, true);
+				if (exclDisks.empty()) {
+					continue;
 				}
+				auto componentPolygon = ccb_to_general_polygon<ArrCSTraits>(c.outer_ccb());
 
-				std::vector<CSPolygonWithHoles> morphedFacePolygonsWithHoles;
+				std::vector<MorphedFace> componentFaces;
+				try {
+					auto morphedComponentPolygon = morph(bpis, componentPolygon, inclDisks, exclDisks, m_gs, cds);
+					for (auto fit = c.faces_begin(); fit != c.faces_end(); ++fit) {
+						auto facePolygon = face_to_polygon(*fit);
+						MorphedFace morphedFace{i, fit.handle()};
 
-				CGAL::intersection(morphedComponentPolygon, facePolygon, std::back_inserter(morphedFacePolygonsWithHoles));
-				auto& mf = fit->data().morphedFace[i];
-				for (const auto& morphedFacePolygonWithHoles : morphedFacePolygonsWithHoles) {
-					assert(!morphedFacePolygonWithHoles.has_holes()); // todo
-					mf.push_back(morphedFacePolygonWithHoles.outer_boundary());
+						for (const auto& bp : bpis) {
+							CSPolyline mb = associatedBoundary(componentPolygon, morphedComponentPolygon, bp);
+							intersection(mb, facePolygon, std::back_inserter(morphedFace.edges), false, true);
+						}
+
+						std::vector<CSPolygonWithHoles> morphedFacePolygonsWithHoles;
+						CGAL::intersection(morphedComponentPolygon, facePolygon, std::back_inserter(morphedFacePolygonsWithHoles));
+						for (const auto& morphedFacePolygonWithHoles : morphedFacePolygonsWithHoles) {
+							assert(!morphedFacePolygonWithHoles.has_holes()); // todo
+							morphedFace.polygons.push_back(morphedFacePolygonWithHoles.outer_boundary());
+						}
+						componentFaces.push_back(std::move(morphedFace));
+					}
+				} catch (const std::exception& e) {
+					if (!skipFailures) throw;
+					m_warnings.push_back(std::string("Points beneath a shape could not be cut out, so they may be hidden: ") + e.what());
+					continue;
 				}
+				std::move(componentFaces.begin(), componentFaces.end(), std::back_inserter(morphedFaces));
 			}
 		}
+		return morphedFaces;
+	};
+
+	std::vector<MorphedFace> morphedFaces;
+	if (m_cds.smooth) {
+		try {
+			morphedFaces = morphComponents(m_cds, true, false);
+		} catch (const std::exception& e) {
+			ComputeDrawingSettings unsmoothed = m_cds;
+			unsmoothed.smooth = false;
+			morphedFaces = morphComponents(unsmoothed, false, true);
+			m_warnings.push_back(std::string("Smoothing the cut-outs failed, so no cut-outs are smoothed: ") + e.what());
+		}
+	} else {
+		morphedFaces = morphComponents(m_cds, true, true);
 	}
+
+	for (auto& morphedFace : morphedFaces) {
+		auto& data = morphedFace.fh->data();
+		auto& edges = data.morphedEdges[morphedFace.i];
+		std::move(morphedFace.edges.begin(), morphedFace.edges.end(), std::back_inserter(edges));
+		auto& polygons = data.morphedFace[morphedFace.i];
+		std::move(morphedFace.polygons.begin(), morphedFace.polygons.end(), std::back_inserter(polygons));
+	}
+	report(1, 1, 0);
 }
 
 bool overlap(const Circle<Inexact>& c1, const Circle<Inexact>& c2) {
@@ -448,6 +548,10 @@ CSPolygon morph(const std::vector<CSPolyline>& boundaryParts, const CSPolygon& c
 			auto [bpE, bpEstart, bpEtarget] = approximateExtend(bp, CGAL::to_double(8 * sr), dr);
 			auto pgn = closeAroundBB(bpE, CGAL::COUNTERCLOCKWISE, 4 * CGAL::to_double(dr), bpEstart,
 			                         bpEtarget);
+			if (!is_simple(pgn)) {
+				// Then the difference below would give an invalid polygon set, so stop here; see DilatedPatternDrawing.
+				throw std::runtime_error("The extended boundary part of a cut-out cannot be closed into a simple polygon.");
+			}
 			if (pgn.orientation() == CGAL::CLOCKWISE) {
 				pgn.reverse_orientation();
 			}
@@ -483,6 +587,10 @@ CSPolygon morph(const std::vector<CSPolyline>& boundaryParts, const CSPolygon& c
 			auto [bpE, bpEstart, bpEtarget] = approximateExtend(*bp, CGAL::to_double(8 * sr), dr);
 			auto pgn = closeAroundBB(bpE, CGAL::COUNTERCLOCKWISE, 4 * CGAL::to_double(dr), bpEstart,
 			                         bpEtarget);
+			if (!is_simple(pgn)) {
+				// Then the difference below would give an invalid polygon set, so stop here; see DilatedPatternDrawing.
+				throw std::runtime_error("The extended boundary part of a cut-out cannot be closed into a simple polygon.");
+			}
 			GpsCSTraits traits;
 			if (pgn.orientation() == CGAL::CLOCKWISE) {
 				pgn.reverse_orientation();
@@ -654,9 +762,19 @@ DilatedPatternDrawing::includeExcludeDisks(int i, const std::unordered_set<int>&
 	auto rSqrd = m_gs.dilationRadius() * m_gs.dilationRadius();
     auto result = approximateGrowCircles(ptsI, ptsJs, rSqrd, rSqrd * m_cds.cutoutRadiusFactor * m_cds.cutoutRadiusFactor);
 
+	// The exact intersection test is expensive, so first test whether the bounding boxes of the disk and the component
+	// intersect.
 	std::vector<Circle<Exact>> relevantExclusionDisks;
+	auto componentPolygon = ccb_to_general_polygon<ArrCSTraits>(c.outer_ccb());
+	auto componentBox = componentPolygon.bbox();
 	for (const auto& d : result.second) {
-		if (CGAL::do_intersect(circleToCSPolygon(d), ccb_to_general_polygon<ArrCSTraits>(c.outer_ccb()))) {
+		auto diskBox = d.bbox();
+		double margin = 1e-6 * std::max(diskBox.xmax() - diskBox.xmin(), diskBox.ymax() - diskBox.ymin());
+		if (diskBox.xmax() + margin < componentBox.xmin() || diskBox.xmin() - margin > componentBox.xmax() ||
+		    diskBox.ymax() + margin < componentBox.ymin() || diskBox.ymin() - margin > componentBox.ymax()) {
+			continue;
+		}
+		if (CGAL::do_intersect(circleToCSPolygon(d), componentPolygon)) {
 			relevantExclusionDisks.push_back(d);
 		}
 	}
@@ -1037,50 +1155,54 @@ SimpleSetsPainting::getStackedPolygons() const {
     // If there is a stacking order, draw the complete patterns stacked in that order
     if (!stackingOrder.has_value()) { return std::nullopt; }
     for (int i: *stackingOrder) {
-        std::vector<CComponent> comps;
-        connectedComponents(m_dpd.m_arr, std::back_inserter(comps), [i](const FaceH &fh) {
-            const auto &ors = fh->data().origins;
-            return std::find(ors.begin(), ors.end(), i) != ors.end();
-        });
-        assert(comps.size() == 1);
-        const auto &comp = comps[0];
+        polys.emplace_back(m_dpd.m_dilated[i].category(), patternPolygon(i));
+    }
+    return polys;
+}
 
-        std::vector<CSPolyline> boundaryPieces;
-        for (auto fit = comp.faces_begin(); fit != comp.faces_end(); ++fit) {
-            auto &data = fit->data();
-            if (data.morphedFace.contains(i)) {
-                std::copy(data.morphedEdges[i].begin(), data.morphedEdges[i].end(),
-                          std::back_inserter(boundaryPieces));
-            } else {
-                FaceH fh = fit.handle();
-                auto bps = boundaryParts(fh, i);
-                std::copy(bps.begin(), bps.end(), std::back_inserter(boundaryPieces));
-            }
+CSPolygon SimpleSetsPainting::patternPolygon(int i) const {
+    std::vector<CComponent> comps;
+    connectedComponents(m_dpd.m_arr, std::back_inserter(comps), [i](const FaceH &fh) {
+        const auto &ors = fh->data().origins;
+        return std::find(ors.begin(), ors.end(), i) != ors.end();
+    });
+    assert(comps.size() == 1);
+    const auto &comp = comps[0];
+
+    std::vector<CSPolyline> boundaryPieces;
+    for (auto fit = comp.faces_begin(); fit != comp.faces_end(); ++fit) {
+        auto &data = fit->data();
+        if (data.morphedFace.contains(i)) {
+            std::copy(data.morphedEdges[i].begin(), data.morphedEdges[i].end(),
+                      std::back_inserter(boundaryPieces));
+        } else {
+            FaceH fh = fit.handle();
+            auto bps = boundaryParts(fh, i);
+            std::copy(bps.begin(), bps.end(), std::back_inserter(boundaryPieces));
         }
+    }
 
-        // no order or hash on OneRootPoint :(
+    // no order or hash on OneRootPoint :(
 //			std::map<OneRootPoint, int> sourceToI;
 //			for (int j = 0; j < boundaryPieces.size(); ++j) {
 //				auto& bp = boundaryPieces[j];
 //				sourceToI[bp.curves_begin()->source()] = j;
 //			}
-        std::vector<CSXMCurve> xm_curves;
+    std::vector<CSXMCurve> xm_curves;
 
-        std::copy(boundaryPieces[0].curves_begin(), boundaryPieces[0].curves_end(), std::back_inserter(xm_curves));
-        int count = 1;
-        while (count < boundaryPieces.size()) {
-            auto head = xm_curves.back().target();
-            for (const auto &bp: boundaryPieces) {
-                if (bp.curves_begin()->source() == head) {
-                    std::copy(bp.curves_begin(), bp.curves_end(), std::back_inserter(xm_curves));
-                }
+    std::copy(boundaryPieces[0].curves_begin(), boundaryPieces[0].curves_end(), std::back_inserter(xm_curves));
+    int count = 1;
+    while (count < boundaryPieces.size()) {
+        auto head = xm_curves.back().target();
+        for (const auto &bp: boundaryPieces) {
+            if (bp.curves_begin()->source() == head) {
+                std::copy(bp.curves_begin(), bp.curves_end(), std::back_inserter(xm_curves));
             }
-            ++count;
         }
-
-        polys.emplace_back(m_dpd.m_dilated[i].category(), CSPolygon(xm_curves.begin(), xm_curves.end()));
+        ++count;
     }
-    return polys;
+
+    return CSPolygon(xm_curves.begin(), xm_curves.end());
 }
 
 void SimpleSetsPainting::paint(GeometryRenderer& renderer) const {
